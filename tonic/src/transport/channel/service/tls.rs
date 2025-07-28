@@ -14,10 +14,13 @@ use tokio_rustls::{
 };
 
 use super::io::BoxedIo;
-use crate::transport::service::tls::{
-    convert_certificate_to_pki_types, convert_identity_to_pki_types, TlsError, ALPN_H2,
-};
 use crate::transport::tls::{Certificate, Identity};
+use crate::transport::{
+    channel::tls::ModdifyConfigFn,
+    service::tls::{
+        convert_certificate_to_pki_types, convert_identity_to_pki_types, TlsError, ALPN_H2,
+    },
+};
 
 #[derive(Clone)]
 pub(crate) struct TlsConnector {
@@ -37,6 +40,7 @@ impl TlsConnector {
         assume_http2: bool,
         use_key_log: bool,
         timeout: Option<Duration>,
+        modify_config: Option<ModdifyConfigFn>,
         #[cfg(feature = "tls-native-roots")] with_native_roots: bool,
         #[cfg(feature = "tls-webpki-roots")] with_webpki_roots: bool,
     ) -> Result<Self, crate::BoxError> {
@@ -97,6 +101,11 @@ impl TlsConnector {
         }
 
         config.alpn_protocols.push(ALPN_H2.into());
+
+        if let Some(modify_config) = modify_config {
+            modify_config.0(&mut config);
+        }
+
         Ok(Self {
             config: Arc::new(config),
             domain: Arc::new(ServerName::try_from(domain)?.to_owned()),
