@@ -4,6 +4,7 @@ use crate::transport::{
     Error,
 };
 use http::Uri;
+use std::time::Duration;
 use tokio_rustls::rustls::pki_types::TrustAnchor;
 
 /// Configures TLS settings for endpoints.
@@ -20,6 +21,7 @@ pub struct ClientTlsConfig {
     #[cfg(feature = "tls-webpki-roots")]
     with_webpki_roots: bool,
     use_key_log: bool,
+    timeout: Option<Duration>,
 }
 
 #[derive(Clone)]
@@ -125,12 +127,22 @@ impl ClientTlsConfig {
 
     /// Activates all TLS roots enabled through `tls-*-roots` feature flags
     pub fn with_enabled_roots(self) -> Self {
-        let config = ClientTlsConfig::new();
+        let config = self;
+
         #[cfg(feature = "tls-native-roots")]
         let config = config.with_native_roots();
         #[cfg(feature = "tls-webpki-roots")]
         let config = config.with_webpki_roots();
+
         config
+    }
+
+    /// Sets the timeout for the TLS handshake.
+    pub fn timeout(self, timeout: Duration) -> Self {
+        ClientTlsConfig {
+            timeout: Some(timeout),
+            ..self
+        }
     }
 
     /// Adds a function to modify the `ClientConfig` before it is used.
@@ -157,6 +169,7 @@ impl ClientTlsConfig {
             domain,
             self.assume_http2,
             self.use_key_log,
+            self.timeout,
             self.modify_config,
             #[cfg(feature = "tls-native-roots")]
             self.with_native_roots,
